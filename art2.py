@@ -1,11 +1,13 @@
 import numpy as np
+import pandas as pd
 from numpy.linalg import norm
 
 e = 0
 
 
 class ART:
-    def __init__(self, rho, M, N, weight, x, u, v, a, b, c, r, f):
+    def __init__(self, rho, M, N, theta=None):
+        self.epochs = None
         self.ri = None  # calculated result
         self.reset = None
         self.theta = None
@@ -22,8 +24,15 @@ class ART:
         self.yj = np.zeros(self.outputSize) #F2
         self.activeClusters = []
 
-        self.ui = u
-        self.vi = v
+        if theta is None:
+            self.theta = 1 / np.sqrt(self.ii)
+        else:
+            self.theta = theta
+
+        self.theta = self.theta.reshape(-1,1)
+
+        self.ui = None
+        self.vi = None
 
         self.params = {'a': 5, 'b': 5, 'c': 5, 'd': 5, 'e': 0}
         self.alpha = 0.005
@@ -43,8 +52,8 @@ class ART:
             self.ui = np.zeros(self.inputSize)
         else:
             self.ui = self.vi / (e + norm(self.vi))
-            
-        self.wi = self.ii + a*self.ui
+
+        self.wi = self.ii + a*(self.ui.reshape(-1, 1))
 
         # updating weights and activations
         if J is None:
@@ -63,6 +72,7 @@ class ART:
 
     def linFunc(self, weight):
         weight2 = weight.copy()
+
         weight2[weight2 < self.theta] = 0
         return weight2
 
@@ -123,3 +133,47 @@ class ART:
             self.makeF1(J, D)
             # TODO Check exceptions and edge cases
         return True
+
+    def learning(self, dat):
+        self.setZero()
+        self.ii = dat
+        self.makeF1()
+        self.makeF1()
+
+        self.yj = np.dot(self.Bij.T, self.pi)
+        J = self.computeJ()
+
+        if len(self.activeClusters) == 0:
+            self.updateWeights(J)
+        else:
+            self.resonance(J)
+        if J not in self.activeClusters:
+            self.activeClusters.append(J)
+
+        return True
+
+    def training(self, data):
+        for dat in data:
+            self.ii = dat
+            self.learning(dat)
+        return True
+
+    def cleanInput(self):
+        pass
+
+    def trainingLoop(self, data):
+        for epoch in range(self.epochs):
+            self.training(data)
+        return True
+
+
+def main():
+    df = pd.read_csv('data_banknote_authentication.txt')
+    data = df.values
+    # print(data)
+    ip = ART(rho=0.003, M=data.shape[0], N=2)
+    ip.learning(data)
+
+
+if __name__ == '__main__':
+    main()
