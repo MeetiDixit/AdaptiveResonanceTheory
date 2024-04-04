@@ -1,178 +1,140 @@
-import numpy as np
+# art2.py
+
 import pandas as pd
+import numpy as np
 from numpy.linalg import norm
 
-e = 0
 
-
-class ART:
-    def __init__(self, rho, M, N, theta=None):
-        self.epochs = None
-        self.ri = None  # calculated result
-        self.reset = None
-        self.theta = None
-        self.qi = None
-        self.wi = None
-        self.pi = None
-        self.rho = rho
-        self.inputSize = M
-        self.outputSize = N
-
-        # self.weight = weight
-        self.ii = np.zeros(self.inputSize)  #F0
-        self.xi = np.zeros(self.inputSize)  #F1
-        self.yj = np.zeros(self.outputSize) #F2
-        self.activeClusters = []
-
-        if theta is None:
-            self.theta = 1 / np.sqrt(self.ii)
-        else:
-            self.theta = theta
-
-        self.theta = self.theta.reshape(-1,1)
-
+class ART2:
+    def __init__(self, m, n, theta=None, rho=0.7) -> None:
+        self.inputSize = m
+        self.classes = n
+        self.ii = None
         self.ui = None
         self.vi = None
+        self.xi = None
+        self.wi = None
+        self.pi = None
+        self.qi = None
+        self.Zj = np.zeros((self.inputSize, self.classes))
+        self.Bj = np.zeros((self.classes, self.inputSize))
+        self.theta = theta
 
-        self.params = {'a': 5, 'b': 5, 'c': 5, 'd': 5, 'e': 0}
-        self.alpha = 0.005
-        self.Tji = np.zeros((self.inputSize, self.outputSize))
-        self.Bij = np.ones((self.outputSize, self.inputSize))*2.33
-        # self.outputF1 = r
-        # self.linFunc = f
+        self.params = {'a': 4, 'b': 2, 'c': 1, 'd': 7, 'e': 5}
+        self.rho = rho
+        self.yj = np.zeros(self.classes)
+        self.alpha = 0.4
 
-    def makeF1(self, J=None, D=None):
+    def makeF1(self, J=None):
         a = self.params['a']
         b = self.params['b']
-        c = self.params['c']
-        d = self.params['d']
         e = self.params['e']
-        
+        self.setZero()
         if self.vi is None:
             self.ui = np.zeros(self.inputSize)
         else:
             self.ui = self.vi / (e + norm(self.vi))
+        self.wi = self.ii + (a * self.ui)
 
-        self.wi = self.ii + a*(self.ui.reshape(-1, 1))
+        self.xi = self.wi / (e + norm(self.wi))
 
-        # updating weights and activations
+        self.pi = self.ui
+        self.qi = self.pi / (e + norm(self.pi))
+
+        self.vi = self.linearFunc(self.xi) + (b * self.linearFunc(self.qi))
+
+        return
+
+    def updateF1(self, J=None):
+        a = self.params['a']
+        b = self.params['b']
+        d = self.params['d']
+        e = self.params['e']
+        if self.vi is None:
+            self.ui = np.zeros(self.inputSize)
+        else:
+            self.ui = self.vi / (e + norm(self.vi))
+        self.wi = self.ii + (a * self.ui)
+
+        self.xi = self.wi / (e + norm(self.wi))
+
         if J is None:
             self.pi = self.ui
         else:
-            self.pi = self.ui + d*self.Tji[J:]
+            self.pi = self.ui + d * self.Zj[J:]
+        self.qi = self.pi / (e + norm(self.pi))
 
-        # TODO: consider RESET here... umm, ok!?
-            
-        self.xi = self.wi / (e+norm(self.wi))
-        self.qi = self.pi / (e+norm(self.pi))
+        self.vi = self.linearFunc(self.xi) + (b * self.linearFunc(self.qi))
+        # print('ui shape', self.ui.shape)
+        # print('vi shape', self.vi.shape)
+        # print('wi shape', self.wi.shape)
+        # print('pi shape', self.pi.shape)
+        # print('qi shape', self.qi.shape)
+        # print('xi shape', self.xi.shape)
+        # print('xxxxxxxxxxxxx')
 
-        # update vi
-        self.vi = self.linFunc(self.xi) + b*self.linFunc(self.qi)
         return
 
-    def linFunc(self, weight):
+    def linearFunc(self, weight):
         weight2 = weight.copy()
-
         weight2[weight2 < self.theta] = 0
         return weight2
 
     def setZero(self):
-        self.ii = np.zeros(self.inputSize)
         self.ui = np.zeros(self.inputSize)
         self.vi = np.zeros(self.inputSize)
-
-    def updateWeights(self, J):
-        alpha = self.alpha
-        d = self.params['d']
-
-        self.Tji[J, :] = alpha*d*self.ui + (1+alpha*d*(d-1))*self.Tji[J, :]
-        self.Bij[:, J] = alpha*d*self.ui + (1+alpha*d*(d-1))*self.Bij[:, J]
-
         return
 
-    def firstUpdateWts(self, J):
+    def updateWeights(self, J=None):
+        alpha = self.alpha
         d = self.params['d']
-        self.Tji[J, :] = self.ui / (1-d)
-        self.Bij[:, J] = self.ui / (1-d)
+        # print('ui shape', self.ui.shape)
+        # print('Zj shape', self.Zj.shape)
+        # self.Zj[J, :] = (alpha*d*self.ui) + (1+(alpha*d*(d-1)))*self.Zj[J, :]
+        # self.Bj[:, J] = (alpha*d*self.ui) + (1+alpha*d*(d-1))*self.Bj[:, J]
+        # self.Zj[]
         return
 
     def computeJ(self):
-
-        # TODO Check exceptions and edge cases
         self.reset = True
         J = None
         e = self.params['e']
         c = self.params['c']
-
         while self.reset:
             J = np.argmax(self.yj)
-            if self.vi == 0:
+            print(J)
+            if (self.vi == 0).all():
                 self.ui = np.zeros(self.inputSize)
             else:
-                self.ui = self.vi / (e+norm(self.vi))
+                self.ui = self.vi / (e + norm(self.vi))
 
-            # TODO Check exceptions and edge cases
-            self.ri = (self.ui + c*self.pi) / (e + norm(self.ui) + norm(c*self.pi))
-
-            if self.ri >= (self.rho - e):
-                self.reset = False
-                self.makeF1()
-
-            else:
+            self.ri = (self.ui + (c * self.pi)) / (e + norm(self.ui) + norm(c * self.pi))
+            print(self.ri)
+            if norm(self.ri) < (self.rho - e):
                 self.reset = True
-                self.yj[J] = -1
+                self.yj[J] = -1.0
+            elif norm(self.ri) > (self.rho - e):
+                self.reset = False
+                self.updateF1()
+        return self.ri
 
-                # TODO Check exceptions and edge cases
-
-        return J
-
-    def resonance(self, J, epochs=20):
-        for epoch in range(epochs):
-            self.updateWeights(J)
-            D = np.ones(self.outputSize)
-            self.makeF1(J, D)
-            # TODO Check exceptions and edge cases
-        return True
-
-    def learning(self, dat):
-        self.setZero()
-        self.ii = dat
-        self.makeF1()
-        self.makeF1()
-
-        self.yj = np.dot(self.Bij.T, self.pi)
-        J = self.computeJ()
-
-        if len(self.activeClusters) == 0:
-            self.updateWeights(J)
-        else:
-            self.resonance(J)
-        if J not in self.activeClusters:
-            self.activeClusters.append(J)
-
-        return True
-
-    def training(self, data):
-        for dat in data:
-            self.ii = dat
-            self.learning(dat)
-        return True
-
-    def cleanInput(self):
-        pass
-
-    def trainingLoop(self, data):
-        for epoch in range(self.epochs):
-            self.training(data)
-        return True
+    def learning(self, data):
+        for ii in data:
+            self.ii = ii
+            self.makeF1()
+            self.updateF1()
+            self.computeJ()
+            self.updateWeights()
+        return
 
 
 def main():
-    df = pd.read_csv('data_banknote_authentication.txt')
-    data = df.values
-    # print(data)
-    ip = ART(rho=0.003, M=data.shape[0], N=2)
-    ip.learning(data)
+    df = pd.read_csv('/Users/meeti/Downloads/art2/2/test1.txt', header=None)
+    df = df.iloc[:, :-1]
+    dfIp = df.values
+    nn = ART2(m=4, n=2, rho=0.3, theta=0.1)
+    nn.learning(dfIp)
+    print('yay')
 
 
 if __name__ == '__main__':
