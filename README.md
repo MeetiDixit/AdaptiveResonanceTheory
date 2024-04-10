@@ -1,6 +1,6 @@
-# Re-implementation of ART2
+# Implementation of ART2
 
-This project is a re-implementation of [adaptive_resonance_networks](https://github.com/amanahuja/adaptive_resonance_networks) by [amanahuja](https://github.com/amanahuja), which provided the initial codebase.
+This project is implementation of Adaptive Responance Theory by Stephen Grossberg. The code is inspired by [adaptive_resonance_networks](https://github.com/amanahuja/adaptive_resonance_networks) by [amanahuja](https://github.com/amanahuja), providing the initial codebase.
 
 ## Acknowledgment
 
